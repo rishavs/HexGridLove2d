@@ -2,15 +2,12 @@ debug = true
 
 local inspect = require "inspect"
 
-local hex_size = 100
-local hex_grid_gap = 10
+local hex_size = 50
+local hex_grid_gap = 0
 local lvl_width_hex_count = 10
 local lvl_height_hex_count = 10
 
-local mousex, mousey 
 local hex_grid_obj = {}
-local points_list = {}
-
 -- format is
 
 -- Sample_hex_grid_obj = { 
@@ -44,46 +41,26 @@ function love.draw(dt)
         
         -- love.graphics.print( id, hex.center.x -20, hex.center.y -20)
         
-        love.graphics.print( "x = " .. hex.coord.q, hex.center.x + hex_size/4, hex.center.y + hex_size/4)
-        love.graphics.print( "y = " .. hex.coord.r, hex.center.x - hex_size/2, hex.center.y + hex_size/4)
-        love.graphics.print( "z = " .. hex.coord.s, hex.center.x - hex_size/4, hex.center.y - hex_size/2)
+        love.graphics.print( "x = " .. hex.coord.x, hex.center.x + hex_size/5, hex.center.y + hex_size/5)
+        love.graphics.print( "y = " .. hex.coord.y, hex.center.x - hex_size/2, hex.center.y + hex_size/5)
+        love.graphics.print( "z = " .. hex.coord.z, hex.center.x - hex_size/5, hex.center.y - hex_size/2)
         
     end
-    
-    if #points_list > 0 then
-        love.graphics.points(points_list)
-    end
-    
-    if #points_list > 2 then
-        love.graphics.line(points_list)
-    end
-    
+
     love.graphics.setColor(255, 255, 255)
     love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)    
-    
-    local cQ, cR, cS = pixel_to_hex(mousex, mousey, hex_size)
-    love.graphics.print("id: ".. cQ .. "x" .. cR .. "y" .. cS .. "z", 10, 20)    
-    
-    love.graphics.print(cQ .. "x" .. cR .. "y" .. cS .. "z", mousex -30, mousey -50)    
-    
-    love.graphics.setColor(100, 255, 100)
-    love.graphics.print(mousex .. ", " .. mousey, mousex -30, mousey -30)
 end
 
 function love.update(dt)
-    mousex, mousey = love.mouse.getPosition()
+
 end
 
 function love.mousepressed(x, y, button, istouch)
     if button == 1 then
-    
-        table.insert(points_list, x)
-        table.insert(points_list, y)
-    
-        local cQ, cR, cS = pixel_to_hex(x, y, hex_size)
-        local cSum = cQ + cR + cS
-        print("\nMouse click at: " .. x .. ", " .. y)
-        print(cQ, cR, cS, cSum)
+        local cX, cY, cZ = pixel_to_hex(x, y, hex_size)
+        local cSum = cX + cY + cZ
+        print(cX, cY, cZ, cSum)
+        print(hex_round(cX, cY, cZ))
 
     end
 end
@@ -97,7 +74,7 @@ function create_hex_grid()
     local temp_hex_id = 0
     
     local hex_height = hex_size * 2
-    local hex_width = math.sqrt(3) * hex_size
+    local hex_width = (math.sqrt(3)/2) * hex_height
     
     local starting_hex_X = hex_width/2
     local starting_hex_Y = hex_height/2
@@ -109,20 +86,15 @@ function create_hex_grid()
             hexY = starting_hex_Y + (h * hex_height * 3/4) 
             
             -- calculate and save the axial coordinates
-            local cQ = w - (h - (h % 2)) / 2
-            local cR = h
-            local cS = - cQ - cR
+            local cX = w - (h - (h % 2)) / 2;
+            local cY = h
+            local cZ = - cX - cY
             
-            if cQ == -0 then cQ = 0 end
-            if cR == -0 then cR = 0 end
-            if cS == -0 then cS = 0 end
-    
-    
-            temp_hex_id = cQ .. "x" .. cR .. "y" .. cS .. "z"
+            temp_hex_id = cX .. "x" .. cY .. "y" .. cZ .. "z";
             temp_hex_points = create_hex(hexX, hexY, hex_size - hex_grid_gap/2)
             temp_hex  = {
                 center = {x = hexX, y = hexY},
-                coord = {q = cQ, r = cR, s = cS},
+                coord = {x = cX, y = cY, z = cZ},
                 color = {get_random_color()},
                 fill = "line",
                 vertices = temp_hex_points
@@ -156,48 +128,43 @@ function get_random_color()
     return math.random(50,255), math.random(50,255),  math.random(50,255)
 end
 
-function pixel_to_hex(x, y) 
-    rx = x - math.sqrt(3) * hex_size/2
-    ry = y - hex_size
-    
-    local cQ_float = (rx * math.sqrt(3)/3 - ry / 3) / hex_size 
-    local cR_float =  ry * 2/3 / hex_size 
-    local cS_float = -cQ_float - cR_float
-    
-    -- return cQ_float, cR_float, cS_float
-    local cQ, cR, cS = get_round_hex_coord( cQ_float, cR_float, cS_float)
-    return  cQ, cR, cS
+function pixel_to_hex(x, y, size) 
+
+    local fn_cX = (math.sqrt(3)/3 * x - y/3 ) / size
+    local fn_cY = 2/3 * y / size
+    local fn_cZ = -(math.sqrt(3)/3 * x + y/3 ) / size
+
+    return fn_cX, fn_cY, fn_cZ
+
 end
 
--- Round to the nearest hex
-function get_round_hex_coord(cX_float, cY_float, cZ_float)
+function pixel_to_hex2 (layout, p)
+    local M = layout.orientation
+    local size = layout.size
+    local origin = layout.origin
+    local pt = Point((p.x - origin.x) / size.x, (p.y - origin.y) / size.y)
+    local q = M.b0 * pt.x + M.b1 * pt.y
+    local r = M.b2 * pt.x + M.b3 * pt.y
+    return Hex(q, r, -q - r)
+end
 
-    local fn_cX = round(cX_float)    
-    local fn_cY = round(cY_float)
-    local fn_cZ = round(cZ_float)
+function hex_round (cX_float, cY_float, cZ_float)
+    local fn_cX = math.floor(math.floor (0.5 + cX_float))
+    local fn_cY = math.floor(math.floor (0.5 + cY_float))
+    local fn_cZ = math.floor(math.floor (0.5 + cZ_float))
     
     local cX_diff = math.abs(fn_cX - cX_float)
     local cY_diff = math.abs(fn_cY - cY_float)
     local cZ_diff = math.abs(fn_cZ - cZ_float)
     
-    if cX_diff > cY_diff and cX_diff > cZ_diff then
+    if cX_diff > cY_diff and cY_diff > cZ_diff then
         fn_cX = -fn_cY - fn_cZ
-    elseif cY_diff > cZ_diff then
-        fn_cY = -fn_cX - fn_cZ
     else
-        fn_cZ = -fn_cX - fn_cY
+        if cY_diff > cZ_diff then
+            fn_cY = -fn_cX - fn_cZ
+        else
+            fn_cZ = -fn_cX - fn_cY
+        end
     end
-    
-    if fn_cX == -0 then fn_cX = 0 end
-    if fn_cY == -0 then fn_cY = 0 end
-    if fn_cZ == -0 then fn_cZ = 0 end
-    
     return fn_cX, fn_cY, fn_cZ
-end
-
-
-
-function round(num, dp)
-  local mult = 10^(dp or 0)
-  return (math.floor(num * mult + 0.5)) / mult
 end
