@@ -1,34 +1,44 @@
 debug = true
+love.math.setRandomSeed(os.time())
 
 local inspect = require "inspect"
 
-local hex_size = 10
-local hex_grid_gap = 1
-local lvl_width_hex_count = 40
-local lvl_height_hex_count = 40
+local hex_size = 5
+local hex_grid_gap = 0
+local lvl_width_hex_count = 92
+local lvl_height_hex_count = 79
+
+local water_level =  0.00005
+local var_a = 0.5
+local var_b = 0.5
+local var_c = 0.1
+local var_d = 0.5
+local var_e = 0.5
 
 local mousex, mousey 
 local hex_grid_obj = {}
-local points_list = {}
-
-local test_hex_points ={}
-local test_points_list = {}
 
 function love.load(arg)
-    test_hex_points = create_hex(300, 300, 100)
+
+    lvl_pixel_width = round((lvl_width_hex_count + 1) * math.sqrt(3) * hex_size)
+    lvl_pixel_height = round(2 * hex_size + (1.5 * hex_size * (lvl_height_hex_count -1)))
     
-    -- First create the hex grid
-    create_hex_grid()
-    
-    -- Add neighbour information to each hex in grid
-    -- now make all the edge hexes as water
+    generate()
 end
 
 function love.draw(dt)
 
     for id, hex in pairs(hex_grid_obj) do
-        love.graphics.setColor(50, 50, 50)
-        love.graphics.polygon("line", hex.vertices)
+        
+        if hex.hexType == "empty" then
+            love.graphics.setColor(50, 50, 50)
+            love.graphics.polygon("line", hex.vertices)
+            
+        elseif hex.hexType == "land" then
+            love.graphics.setColor(hex.lum, hex.lum, hex.lum)
+            love.graphics.polygon("fill", hex.vertices)
+            
+        end
         
         -- love.graphics.setColor(255, 255, 255)
         -- love.graphics.print( "x = " .. hex.coord.q, hex.center.x + hex_size/4, hex.center.y + hex_size/4)
@@ -39,8 +49,6 @@ function love.draw(dt)
 
     -- love.graphics.print( id, hex.center.x -20, hex.center.y -20)
     
-
-    
     love.graphics.setColor(255, 255, 255)
     love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)    
 
@@ -50,28 +58,52 @@ function love.update(dt)
     mousex, mousey = love.mouse.getPosition()
 end
 
-function love.mousepressed(x, y, button, istouch)
+function love.mousepressed(x, y, button)
     if button == 1 then
-    
-        table.insert(points_list, x)
-        table.insert(points_list, y)
     
         local h_id = get_hex_id_from_point(x, y)
         if h_id then
-            local cQ, cR, cS = h_id.q, h_id.r, h_id.s
-            local cSum = cQ + cR + cS
             print("\nMouse click at: " .. x .. ", " .. y)
-            print("Hex Id is : " .. cQ .. "q " .. cR .. "r " .. cS .. "s and Sum = " .. cSum)
-            
-            local h_id = cQ .. "q" .. cR .. "r" .. cS .. "s"
-            local nbr = get_hex_neighbour(h_id)
-            print("Is Hex on the Edge? : ", hex_grid_obj[h_id].isOnEdge)
-            print("its neighbours are : \n" .. inspect(nbr))
+            print("Hex details are:")
+            print(inspect(hex_grid_obj[h_id.id]))
         end
+    elseif button == 2 then
+        print(love.math.noise( x, y ))
+    
     end
 end
 
+
+function love.keypressed(key)
+    if key == "space" then
+        -- reset everything
+        local hex_grid_obj = {}
+        generate()
+    end
+end
 ----------------------------------------------------------------
+
+function generate()
+
+    create_hex_grid()
+    set_seed()
+    set_elevation()
+    -- set_moisture()
+    set_biomes()
+
+    -- set_habitability() 
+end
+
+function set_seed(s)
+    if s then
+        seed = s
+    else
+        -- Seed is a 4 digit number
+        seed =  love.math.random(1000, 9999 ) / 10000
+        print("Seed : " .. seed)
+    end
+    
+end
 
 function create_hex_grid()
     
@@ -168,6 +200,7 @@ function get_hex_id_from_point(x, y)
     if hex_grid_obj[test_hex_id] then
         return  temp_hex_obj
     else
+        print("Hex " .. test_hex_id .. " dont exist yo!")
         return false
     end
 end
@@ -219,7 +252,6 @@ function get_hex_neighbour(id)
     
     local coords = hex_grid_obj[id].coord
     local cQ, cR, cS = coords.q, coords.r, coords.s
-    print("Id : " .. cQ .. "q" .. cR .. "r" .. cS .. "s" )
     
     nNE.q = cQ + 1
     nNE.r = cR - 1
@@ -307,4 +339,103 @@ function get_hex_neighbour(id)
 
     return neighbours
     
+end
+
+function get_pixel_dist_between_hexes(id1, id2)
+    local p1x = hex_grid_obj[id1].center.x
+    local p1y = hex_grid_obj[id1].center.y
+    local p2x = hex_grid_obj[id2].center.x
+    local p2y = hex_grid_obj[id2].center.y
+
+    return get_dist_between_points(p1x, p1y, p2x, p2y)
+end
+
+function get_dist_between_points(x1,y1, x2,y2) 
+    return ((x2-x1)^2+(y2-y1)^2)^0.5 
+end
+
+function set_elevation()
+
+    local min_elv = 1
+    local max_elv = 0
+    
+    for id, hex in pairs(hex_grid_obj) do
+
+        if hex.isOnEdge then
+            hex.elevation = 0
+            hex.hexType = "water"
+        else
+            local dx = 2 * hex.center.x / love.graphics.getWidth() - 1 -- change formula to use lvl_pixel_width instead
+            local dy = 2 * hex.center.y / love.graphics.getHeight() - 1 -- change formula to use lvl_pixel_height instead
+            -- at this point 0 <= dx <= 1 and 0 <= dy <= 1
+            local d_sqr =  dx*dx + dy*dy
+            
+            -- Manhattan Distance
+            local m_dist = 2*math.max(math.abs(dx), math.abs(dy))
+            
+            local elv_merged_noise =    
+                  1.00  * love.math.noise (( 1 + seed) * dx, ( 1 + seed) * dy)
+                + 0.50  * love.math.noise (( 2 + seed) * dx, ( 2 + seed) * dy)
+                + 0.25  * love.math.noise (( 4 + seed) * dx, ( 4 + seed) * dy)
+                + 0.13  * love.math.noise (( 8 + seed) * dx, ( 8 + seed) * dy)
+                + 0.06  * love.math.noise ((16 + seed) * dx, (16 + seed) * dy)
+                + 0.03  * love.math.noise ((32 + seed) * dx, (32 + seed) * dy)
+                + 0.02  * love.math.noise ((64 + seed) * dx, (64 + seed) * dy)
+
+            local elevation = (elv_merged_noise + var_a) * (1 - (var_b*m_dist^var_c))
+            
+            
+            if elevation < var_d + var_e * d_sqr then
+                hex_grid_obj[id].elevation = 0
+            else 
+                hex_grid_obj[id].elevation = elevation
+            end
+            
+            -- temp gradient value. will be removed when biomes are done
+            hex_grid_obj[id].lum = math.min(round(elevation * 255 ), 255)
+            
+            -- just debug info to find the lowest elevation
+            if elevation < min_elv then
+                min_elv = elevation
+            end
+            -- just debug info to find the highest elevation
+            if elevation > max_elv then
+                max_elv = elevation
+            end
+            -- print(elevation)
+        end
+    end
+    
+    print("Min Elevation: " .. min_elv)
+    print("Max Elevation: " .. max_elv)
+    print()
+end
+
+function set_biomes ()
+    for id, hex in pairs(hex_grid_obj) do
+    
+        if hex.elevation < water_level then
+            hex.hexType = "empty"
+        else
+            hex.hexType = "land"
+        end
+
+    end
+
+end
+
+function probability(n)
+    if n == 100 then
+        return true
+    elseif n == 0 then
+        return false
+    else
+        local rand = math.random(0, 100)
+        
+        if rand < n then
+            return true
+        else 
+            return false
+        end
+    end
 end
