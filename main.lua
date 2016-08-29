@@ -3,10 +3,10 @@ love.math.setRandomSeed(os.time())
 
 local inspect = require "inspect"
 
-local hex_size = 5
+local hex_size = 3
 local hex_grid_gap = 0
-local lvl_width_hex_count = 92
-local lvl_height_hex_count = 79
+local lvl_width_hex_count = 153
+local lvl_height_hex_count = 132
 
 local water_level =  0.00005
 local var_a = 0.5
@@ -20,8 +20,8 @@ local hex_grid_obj = {}
 
 function love.load(arg)
 
-    lvl_pixel_width = round((lvl_width_hex_count + 1) * math.sqrt(3) * hex_size)
-    lvl_pixel_height = round(2 * hex_size + (1.5 * hex_size * (lvl_height_hex_count -1)))
+    lvl_pixel_width = roundup((lvl_width_hex_count + 1) * math.sqrt(3) * hex_size)
+    lvl_pixel_height = roundup(2 * hex_size + (1.5 * hex_size * (lvl_height_hex_count -1)))
     
     generate()
 end
@@ -31,7 +31,7 @@ function love.draw(dt)
     for id, hex in pairs(hex_grid_obj) do
         
         if hex.hexType == "empty" then
-            love.graphics.setColor(50, 50, 50)
+            love.graphics.setColor(50, 50, 90)
             love.graphics.polygon("line", hex.vertices)
             
         elseif hex.hexType == "land" then
@@ -99,7 +99,7 @@ function set_seed(s)
         seed = s
     else
         -- Seed is a 4 digit number
-        seed =  love.math.random(1000, 9999 ) / 10000
+        seed =  love.math.random(1, 9 ) / 10
         print("Seed : " .. seed)
     end
     
@@ -185,7 +185,7 @@ function get_hex_id_from_point(x, y)
     local cS_float = -cQ_float - cR_float
     
     -- return cQ_float, cR_float, cS_float
-    local cQ, cR, cS = get_round_hex_coord( cQ_float, cR_float, cS_float)
+    local cQ, cR, cS = get_roundup_hex_coord( cQ_float, cR_float, cS_float)
     
     -- check if hex exists
     local test_hex_id = cQ .. "q" .. cR .. "r" .. cS .. "s"
@@ -206,11 +206,11 @@ function get_hex_id_from_point(x, y)
 end
 
 -- Round to the nearest hex
-function get_round_hex_coord(cX_float, cY_float, cZ_float)
+function get_roundup_hex_coord(cX_float, cY_float, cZ_float)
 
-    local fn_cX = round(cX_float)    
-    local fn_cY = round(cY_float)
-    local fn_cZ = round(cZ_float)
+    local fn_cX = roundup(cX_float)    
+    local fn_cY = roundup(cY_float)
+    local fn_cZ = roundup(cZ_float)
     
     local cX_diff = math.abs(fn_cX - cX_float)
     local cY_diff = math.abs(fn_cY - cY_float)
@@ -231,7 +231,7 @@ function get_round_hex_coord(cX_float, cY_float, cZ_float)
     return fn_cX, fn_cY, fn_cZ
 end
 
-function round(num, dp)
+function roundup(num, dp)
     local mult = 10^(dp or 0)
     return (math.floor(num * mult + 0.5)) / mult
 end
@@ -356,17 +356,22 @@ end
 
 function set_elevation()
 
+    -- Counter to check the actual raw values of min and max elevation
     local min_elv = 1
     local max_elv = 0
+
+    -- Setting the min and max values of elevation. These values are found by observation. Used for normalizing
+    local mine = 0.3
+    local maxe  = 1.4
     
     for id, hex in pairs(hex_grid_obj) do
 
         if hex.isOnEdge then
-            hex.elevation = 0
-            hex.hexType = "water"
+            hex_grid_obj[id].elevation = 0
         else
-            local dx = 2 * hex.center.x / love.graphics.getWidth() - 1 -- change formula to use lvl_pixel_width instead
-            local dy = 2 * hex.center.y / love.graphics.getHeight() - 1 -- change formula to use lvl_pixel_height instead
+            local dx = 2 * hex.center.x / lvl_pixel_width - 1 -- change formula to use lvl_pixel_width instead
+            local dy = 2 * hex.center.y / lvl_pixel_height - 1 -- change formula to use lvl_pixel_height instead
+            
             -- at this point 0 <= dx <= 1 and 0 <= dy <= 1
             local d_sqr =  dx*dx + dy*dy
             
@@ -374,25 +379,24 @@ function set_elevation()
             local m_dist = 2*math.max(math.abs(dx), math.abs(dy))
             
             local elv_merged_noise =    
-                  1.00  * love.math.noise (( 1 + seed) * dx, ( 1 + seed) * dy)
-                + 0.50  * love.math.noise (( 2 + seed) * dx, ( 2 + seed) * dy)
-                + 0.25  * love.math.noise (( 4 + seed) * dx, ( 4 + seed) * dy)
-                + 0.13  * love.math.noise (( 8 + seed) * dx, ( 8 + seed) * dy)
-                + 0.06  * love.math.noise ((16 + seed) * dx, (16 + seed) * dy)
-                + 0.03  * love.math.noise ((32 + seed) * dx, (32 + seed) * dy)
-                + 0.02  * love.math.noise ((64 + seed) * dx, (64 + seed) * dy)
+                   1.00 * love.math.noise (( 1 + seed) * dx, ( 1 + seed) * dy)
+                + 0.50 * love.math.noise (( 2 + seed) * dx, ( 2 + seed) * dy)
+                + 0.25 * love.math.noise (( 4 + seed) * dx, ( 4 + seed) * dy)
+                + 0.13 * love.math.noise (( 8 + seed) * dx, ( 8 + seed) * dy)
+                + 0.06 * love.math.noise ((16 + seed) * dx, (16 + seed) * dy)
+                + 0.03 * love.math.noise ((32 + seed) * dx, (32 + seed) * dy)
+                + 0.02 * love.math.noise ((64 + seed) * dx, (64 + seed) * dy)
 
             local elevation = (elv_merged_noise + var_a) * (1 - (var_b*m_dist^var_c))
-            
-            
+
             if elevation < var_d + var_e * d_sqr then
-                hex_grid_obj[id].elevation = 0
+                hex_grid_obj[id].elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
             else 
                 hex_grid_obj[id].elevation = elevation
             end
             
             -- temp gradient value. will be removed when biomes are done
-            hex_grid_obj[id].lum = math.min(round(elevation * 255 ), 255)
+            hex_grid_obj[id].lum = math.min(roundup(elevation * 255 ), 255)
             
             -- just debug info to find the lowest elevation
             if elevation < min_elv then
@@ -402,13 +406,37 @@ function set_elevation()
             if elevation > max_elv then
                 max_elv = elevation
             end
-            -- print(elevation)
+            
+            -- Normalize the elevation values based on mine and maxe values
+
+            -- print("Raw Elevation = " .. hex.elevation)
+            local norm_elevation = math.min((hex.elevation - mine) / ( maxe - mine ))
+            -- print("Norm Elevation = " .. norme)
+
+            hex_grid_obj[id].elevation = norm_elevation
+
+            -- temp gradient value. will be removed when biomes are done
+            hex_grid_obj[id].lum = math.min(roundup(norm_elevation * 255 ), 255)
+            
+            if norm_elevation < mine then
+                min_norm_elv = norm_elevation
+            end
+            -- just debug info to find the highest elevation
+            if norm_elevation > maxe then
+                max_norm_elv = norm_elevation
+            end
+
         end
     end
     
-    print("Min Elevation: " .. min_elv)
-    print("Max Elevation: " .. max_elv)
+    print("Min Raw Elevation: " .. min_elv)
+    print("Max Raw Elevation: " .. max_elv)
     print()
+
+    print("Min Norm Elevation: " .. mine)
+    print("Max Norm Elevation: " .. maxe)
+    print()
+    
 end
 
 function set_biomes ()
