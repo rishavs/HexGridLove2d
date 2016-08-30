@@ -99,7 +99,7 @@ function set_seed(s)
         seed = s
     else
         -- Seed is a 4 digit number
-        seed =  love.math.random(1, 9 ) / 10
+        seed =  love.math.random(1000, 9999 ) 
         print("Seed : " .. seed)
     end
     
@@ -364,6 +364,8 @@ function set_elevation()
     local mine = 0.3
     local maxe  = 1.4
     
+    local map_spr = roundup(lvl_height_hex_count / 10)
+    
     for id, hex in pairs(hex_grid_obj) do
 
         if hex.isOnEdge then
@@ -371,21 +373,31 @@ function set_elevation()
         else
             local dx = 2 * hex.center.x / lvl_pixel_width - 1 -- change formula to use lvl_pixel_width instead
             local dy = 2 * hex.center.y / lvl_pixel_height - 1 -- change formula to use lvl_pixel_height instead
-            
+            -- print("DX: " .. dx)
+            -- print("DY: " .. dy)
             -- at this point 0 <= dx <= 1 and 0 <= dy <= 1
             local d_sqr =  dx*dx + dy*dy
             
             -- Manhattan Distance
             local m_dist = 2*math.max(math.abs(dx), math.abs(dy))
             
+            -- local elv_merged_noise =    
+                   -- 1.00 * love.math.noise (( 1 + seed) * dx, ( 1 + seed) * dy)
+                -- + 0.50 * love.math.noise (( 2 + seed) * dx, ( 2 + seed) * dy)
+                -- + 0.25 * love.math.noise (( 4 + seed) * dx, ( 4 + seed) * dy)
+                -- + 0.13 * love.math.noise (( 8 + seed) * dx, ( 8 + seed) * dy)
+                -- + 0.06 * love.math.noise ((16 + seed) * dx, (16 + seed) * dy)
+                -- + 0.03 * love.math.noise ((32 + seed) * dx, (32 + seed) * dy)
+                -- + 0.02 * love.math.noise ((64 + seed) * dx, (64 + seed) * dy)
+                
             local elv_merged_noise =    
-                   1.00 * love.math.noise (( 1 + seed) * dx, ( 1 + seed) * dy)
-                + 0.50 * love.math.noise (( 2 + seed) * dx, ( 2 + seed) * dy)
-                + 0.25 * love.math.noise (( 4 + seed) * dx, ( 4 + seed) * dy)
-                + 0.13 * love.math.noise (( 8 + seed) * dx, ( 8 + seed) * dy)
-                + 0.06 * love.math.noise ((16 + seed) * dx, (16 + seed) * dy)
-                + 0.03 * love.math.noise ((32 + seed) * dx, (32 + seed) * dy)
-                + 0.02 * love.math.noise ((64 + seed) * dx, (64 + seed) * dy)
+                   1.00 * love.math.noise ( 1 * (dx + seed),   1 * (dy + seed))
+                + 0.50 * love.math.noise ( 2 * (dx + seed),   2 * (dy + seed))
+                + 0.25 * love.math.noise ( 4 * (dx + seed),   4 * (dy + seed))
+                + 0.13 * love.math.noise ( 8 * (dx + seed),   8 * (dy + seed))
+                + 0.06 * love.math.noise (16 * (dx + seed), 16 * (dy + seed))
+                + 0.03 * love.math.noise (32 * (dx + seed), 32 * (dy + seed))
+                + 0.02 * love.math.noise (64 * (dx + seed), 64 * (dy + seed))
 
             local elevation = (elv_merged_noise + var_a) * (1 - (var_b*m_dist^var_c))
 
@@ -394,7 +406,13 @@ function set_elevation()
             else 
                 hex_grid_obj[id].elevation = elevation
             end
-            
+            -- if elevation < var_d + var_e * d_sqr then
+                -- hex_grid_obj[id].elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
+            -- elseif elevation > var_d + var_e * d_sqr and elevation < var_d *1.2 + var_e * d_sqr then
+                -- hex_grid_obj[id].elevation = 1.33
+            -- else 
+                -- hex_grid_obj[id].elevation = elevation
+            -- end
             -- temp gradient value. will be removed when biomes are done
             hex_grid_obj[id].lum = math.min(roundup(elevation * 255 ), 255)
             
