@@ -1,21 +1,33 @@
 debug = true
 love.math.setRandomSeed(os.time())
 
-local inspect = require "inspect"
+inspect = require "inspect"
+Camera = require "camera"
 
-local hex_size = 3
+local hex_size = 5
 local hex_grid_gap = 0
-local lvl_width_hex_count = 153
-local lvl_height_hex_count = 132
+local lvl_width_hex_count = 92
+local lvl_height_hex_count = 79
 
-local water_level =  0.00005
-local var_a = 1
-local var_b = 1
-local var_c = 1
+local scrWidth = love.graphics.getWidth()
+local scrHeight = love.graphics.getHeight()
+
+local var_a = 0.1
+local var_b = 0.6
+local var_c = 0.7
 local var_d = 0.4
 local var_e = 0.4
-local var_exp = 1
 
+local min_raw_elv = 1
+local max_raw_elv = 0
+local min_raw_mst = 1
+local max_raw_mst = 0
+
+    -- State Declarations ----------------------
+local camX, camY, camZoom, camRot = 100, 100, 1, 0
+local screenEdge = 0.95
+cam = Camera(0, 0)
+    
 local mousex, mousey 
 local hex_grid_obj = {}
 
@@ -28,35 +40,51 @@ function love.load(arg)
 end
 
 function love.draw(dt)
-
+    local render_count = 0
+    -- cam:attach()
     for id, hex in pairs(hex_grid_obj) do
-        
-        if hex.biome == "empty" then
-            love.graphics.setColor(50, 50, 90)
-            love.graphics.polygon("line", hex.vertices)
-            
-        elseif hex.biome == "land" then
+        -- local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
+        local hexX, hexY = hex.center.x, hex.center.y
+        -- only render if hexes are within the screen
+        if 0 < hexX and hexX < scrWidth 
+            and 0 < hexY and hexY < scrHeight then        
+
             love.graphics.setColor(hex.lum, hex.lum, hex.lum)
-            love.graphics.polygon("fill", hex.vertices)
-            
+            love.graphics.polygon(hex.fillType, hex.vertices)
+        
+            render_count = render_count + 1
         end
-        
-        -- love.graphics.setColor(255, 255, 255)
-        -- love.graphics.print( "x = " .. hex.coord.q, hex.center.x + hex_size/4, hex.center.y + hex_size/4)
-        -- love.graphics.print( "y = " .. hex.coord.r, hex.center.x - hex_size/2, hex.center.y + hex_size/4)
-        -- love.graphics.print( "z = " .. hex.coord.s, hex.center.x - hex_size/4, hex.center.y - hex_size/2)
-        
     end
+    -- cam:detach()
 
     -- love.graphics.print( id, hex.center.x -20, hex.center.y -20)
     
     love.graphics.setColor(255, 255, 255)
     love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)    
-
+    love.graphics.print("Hexes: ".. render_count, 10, 30)
 end
 
+local camAccl = 0
 function love.update(dt)
     mousex, mousey = love.mouse.getPosition()
+    
+    if love.keyboard.isDown("up", "down", "left", "right") then
+        camAccl = (camAccl + dt)
+         
+         if love.keyboard.isDown("left") then
+            cam:move(-50 * camAccl, 0)
+        elseif love.keyboard.isDown ('right') then
+            cam:move(50 * camAccl, 0)
+        elseif love.keyboard.isDown ('up') then
+            cam:move(0, -50 * camAccl)
+        elseif love.keyboard.isDown('down') then
+            cam:move(0, 50 * camAccl)
+        end
+        
+    else
+        camAccl = 0
+    end
+    
 end
 
 function love.mousepressed(x, y, button)
@@ -67,6 +95,7 @@ function love.mousepressed(x, y, button)
             print("\nMouse click at: " .. x .. ", " .. y)
             print("Hex details are:")
             print(inspect(hex_grid_obj[h_id.id]))
+            hex_grid_obj[h_id.id].fillType = "line"
         end
     elseif button == 2 then
         print(love.math.noise( x, y ))
@@ -75,6 +104,16 @@ function love.mousepressed(x, y, button)
 end
 
 
+    -- Camera Zoom using Mouse Wheel
+function love.wheelmoved(x,y)
+    
+    if y > 0 then
+        cam.scale = cam.scale * 1.2
+    elseif y < 0 then
+        cam.scale = cam.scale * 0.8
+    end
+ end
+ 
 function love.keypressed(key)
     if key == "space" then
         -- reset everything
@@ -90,17 +129,32 @@ function generate()
     set_seed()
     set_elevation()
     set_moisture()
-    set_biomes()
+    normalize_noise()
+    -- set_basic_biomes()
+    -- set_coastlines()
+    -- set_shallows()
+    -- set_rivers()
+    -- set_habitability()
+    
 
     -- set_habitability() 
+    -- 
+end
+
+function draw_on_canvas()
+
 end
 
 function set_seed(s)
+    local seed_min = 1000
+    local seed_max = 9999
+    
     if s then
         seed = s
     else
         -- Seed is a 4 digit number
-        seed =  love.math.random(1000, 9999 ) 
+        seed =  love.math.random(seed_min, seed_max ) 
+
         print("Seed : " .. seed)
     end
     
@@ -119,8 +173,8 @@ function create_hex_grid()
     local starting_hex_Y = hex_height/2
     
     -- first create a staggered points grid
-    for w=0, lvl_width_hex_count - 1 do
-        for h = 0, lvl_height_hex_count - 1 do
+    for h = 0, lvl_height_hex_count - 1 do
+        for w = 0, lvl_width_hex_count - 1 do
             hexX = starting_hex_X + (w * hex_width) + ((hex_width/2) * (h % 2))
             hexY = starting_hex_Y + (h * hex_height * 3/4) 
             
@@ -141,6 +195,7 @@ function create_hex_grid()
                 coord = {q = cQ, r = cR, s = cS},
                 biome = "empty",
                 isOnEdge = false,
+                fillType = "fill",
                 vertices = temp_hex_points
             }
             
@@ -360,9 +415,9 @@ function set_elevation()
     for id, hex in pairs(hex_grid_obj) do
 
         if hex.isOnEdge then
-            hex_grid_obj[id].elevation = 0
+            hex.elevation = 0
         else
-            local dx = 2 * hex.center.x / lvl_pixel_width - 1 
+            local dx = 2 * hex.center.x / lvl_pixel_width - 1
             local dy = 2 * hex.center.y / lvl_pixel_height - 1
 
             local d_sqr =  dx*dx + dy*dy
@@ -377,72 +432,167 @@ function set_elevation()
                 + 0.02 * love.math.noise ( 64 * (dx + seed),   64 * (dy + seed))
                 + 0.01 * love.math.noise (128 * (dx + seed), 128 * (dy + seed))
 
-            local elevation = (elv_merged_noise / 2) ^ var_exp
-
-            if elevation < var_d + var_e * d_sqr then
-                hex_grid_obj[id].elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
+            local elevation = round(((elv_merged_noise + var_a) * (1 - (var_b*d_sqr^var_c))), 2)
+            local water_lvl = round((var_d + var_e * d_sqr ), 2) 
+            
+            if elevation < water_lvl then
+                hex.elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
             else 
-                hex_grid_obj[id].elevation = elevation
+                hex.elevation = elevation
             end
-            -- if elevation < var_d + var_e * d_sqr then
-                -- hex_grid_obj[id].elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
-            -- elseif elevation > var_d + var_e * d_sqr and elevation < var_d *1.2 + var_e * d_sqr then
-                -- hex_grid_obj[id].elevation = 2
-            -- else 
-                -- hex_grid_obj[id].elevation = elevation
-            -- end
-            -- temp gradient value. will be removed when biomes are done
-            hex_grid_obj[id].lum = math.min(round(elevation * 255 ), 255)
            
+            -- just debug info to find the lowest elevation
+            if elevation < min_raw_elv then
+                min_raw_elv = elevation
+            end
+            -- just debug info to find the highest elevation
+            if elevation > max_raw_elv then
+                max_raw_elv = elevation
+            end
+            
         end
+        
+        -- temp gradient value. will be removed when biomes are done
+        hex.lum = math.min(round(hex.elevation * 255 ), 255)
+        
     end
+    
+    print("Min Elv = " .. min_raw_elv)
+    print("Max Elv = " .. max_raw_elv)
+    
 end
 
 function set_moisture()
 
     -- will have to create the moisture seed as a function of the global seed
-    local mst_seed = seed
+    love.math.setRandomSeed(seed)
+    local mst_seed = love.math.random(1000, 9999)
+    
+    print("Moisture Seed = " .. mst_seed)
     
     local map_spr = round(lvl_height_hex_count / 10)
     
     for id, hex in pairs(hex_grid_obj) do
 
         if hex.elevation == 0 then
-            hex_grid_obj[id].moisture = 0
+            hex.moisture = 0
         else
-            local dx = 2 * hex.center.x / lvl_pixel_width - 1 
+            local dx = 2 * hex.center.x / lvl_pixel_width - 1
             local dy = 2 * hex.center.y / lvl_pixel_height - 1
-                
-            local mst_merged_noise =    
-                   1.00 * love.math.noise ( 1 * (dx + seed),  ( 1 * (dy + seed)))
-                + 0.50 * love.math.noise (  2 * (dx + seed),     2 * (dy + seed))
-                + 0.25 * love.math.noise (  4 * (dx + seed),     4 * (dy + seed))
-                + 0.13 * love.math.noise (  8 * (dx + seed),     8 * (dy + seed))
-                + 0.06 * love.math.noise ( 16 * (dx + seed),   16 * (dy + seed))
-                + 0.03 * love.math.noise ( 32 * (dx + seed),   32 * (dy + seed))
-                + 0.02 * love.math.noise ( 64 * (dx + seed),   64 * (dy + seed))
-                + 0.01 * love.math.noise (128 * (dx + seed), 128 * (dy + seed))
-                    
-            local moisture = round(mst_merged_noise / (2), 1)
-            -- Moisture needs no normalization as it is already between 0 to 1
-            hex_grid_obj[id].moisture = moisture
-            hex_grid_obj[id].lum = math.min(round(moisture * 255 ), 255)
+
+            local mst_merged_noise =
+                   1.00 * love.math.noise (  1 * (dx + mst_seed),     1 * (dy + mst_seed))
+                + 0.50 * love.math.noise (  2 * (dx + mst_seed),     2 * (dy + mst_seed))
+                + 0.25 * love.math.noise (  4 * (dx + mst_seed),     4 * (dy + mst_seed))
+                + 0.13 * love.math.noise (  8 * (dx + mst_seed),     8 * (dy + mst_seed))
+                + 0.06 * love.math.noise ( 16 * (dx + mst_seed),   16 * (dy + mst_seed))
+                + 0.03 * love.math.noise ( 32 * (dx + mst_seed),   32 * (dy + mst_seed))
+                + 0.02 * love.math.noise ( 64 * (dx + mst_seed),   64 * (dy + mst_seed))
+                + 0.01 * love.math.noise (128 * (dx + mst_seed), 128 * (dy + mst_seed))
+
+            local moisture = round(mst_merged_noise / (2) ^ var_d, 2)
+
+            hex.moisture = moisture
+            -- hex.lum = math.min(round(moisture * 255 ), 255)
+            
+            -- just debug info to find the lowest elevation
+            if moisture < min_raw_mst then
+                min_raw_mst = moisture
+            end
+            -- just debug info to find the highest elevation
+            if moisture > max_raw_mst then
+                max_raw_mst = moisture
+            end
+            
         end
     end
+    
+    print("Min Mst = " .. min_raw_mst)
+    print("Max Mst = " .. max_raw_mst)
     
 end
 
-function set_biomes ()
+function normalize_noise()
     for id, hex in pairs(hex_grid_obj) do
     
-        if hex.elevation == 0 then
-            hex.biome = "empty"
-        else
-            hex.biome = "land"
-        end
+        local norm_elevation = math.max(round((hex.elevation - min_raw_elv) / ( max_raw_elv - min_raw_elv ), 1), 0)
+        print(hex.elevation, norm_elevation)
+        hex.elevation = norm_elevation
 
+        local norm_moisture = math.max(round((hex.moisture - min_raw_mst) / ( max_raw_mst - min_raw_mst ), 1), 0 )
+        hex.moisture = norm_moisture
     end
+end
 
+function set_basic_biomes ()
+    for id, hex in pairs(hex_grid_obj) do
+        -- 0 to 0.1
+        if hex.elevation < 0.1 then
+            hex.biome = "ocean"
+            hex.tempColor = {20, 120, 200}
+        -- 0.1 to 0.2
+        elseif hex.elevation < 0.2 then
+            hex.biome = "shallows"
+            hex.tempColor = {0, 150, 250}
+            
+        elseif hex.elevation < 0.5 then
+            hex.biome = "lowlands"
+            
+            if hex.moisture < 0.6 then
+                hex.biome = "lowlands_beach"
+                hex.tempColor = {252, 243, 207}
+            elseif hex.moisture < 0.8 then
+                hex.biome = "lowlands_rocky"
+                hex.tempColor = {237, 187, 153}
+            else
+                hex.biome = "lowlands_marsh"
+                hex.tempColor = {162, 217, 206}
+            end
+
+            
+        elseif hex.elevation < 0.7 then
+            hex.biome = "plains"
+            if hex.moisture < 0.4 then
+                hex.biome = "plains_arid"
+                hex.tempColor = {255, 171, 145}
+            elseif hex.moisture < 0.7 then
+                hex.biome = "plains_grass"
+                hex.tempColor = {139, 195, 74}
+            else
+                hex.biome = "plains_forest"
+                hex.tempColor = {27, 94, 32}
+            end
+            
+        elseif hex.elevation < 0.8 then
+            hex.biome = "hills"
+            if hex.moisture < 0.6 then
+                hex.biome = "hills_rocky"
+                hex.tempColor = {188, 170, 164}
+            elseif hex.moisture < 0.8 then
+                hex.biome = "hills_shrubs"
+                hex.tempColor = {220, 237, 200}
+            else
+                hex.biome = "hills_woods"
+                hex.tempColor = {158, 157, 36}
+            end
+            
+        elseif hex.elevation < 0.9 then
+            hex.biome = "mountains"
+            if hex.moisture < 0.6 then
+                hex.biome = "mountains_rocky"
+                hex.tempColor = {109, 76, 65}
+            elseif hex.moisture < 0.8 then
+                hex.biome = "mountains_tundra"
+                hex.tempColor = {230, 238, 156}
+            else
+                hex.biome = "mountains_alpine"
+                hex.tempColor = {129, 199, 132}
+            end
+        else
+            hex.biome = "peaks"
+            hex.tempColor = {255, 255, 255}
+        end
+    end
 end
 
 function probability(n)
