@@ -4,7 +4,7 @@ love.math.setRandomSeed(os.time())
 inspect = require "inspect"
 Camera = require "camera"
 
-local hex_size = 50
+local hex_size = 40
 local hex_grid_gap = 0
 local lvl_width_hex_count = 92
 local lvl_height_hex_count = 79
@@ -38,6 +38,28 @@ function love.load(arg)
     lvl_pixel_height = round(2 * hex_size + (1.5 * hex_size * (lvl_height_hex_count -1)))
     
     generate()
+
+    -- Load sprite sheet
+    tile_sheet = love.graphics.newImage("assets/FlatHexes/sprites.png")
+    
+	lowlands_beach_tile = love.graphics.newQuad(0, 82, 69, 80, tile_sheet:getDimensions())
+	lowlands_marshy_tile = love.graphics.newQuad(0, 0, 69, 80, tile_sheet:getDimensions())
+	lowlands_rocky_tile = love.graphics.newQuad(71, 0, 69, 80, tile_sheet:getDimensions())
+
+	plains_arid_tile = love.graphics.newQuad(71, 82, 69, 80, tile_sheet:getDimensions())
+	plains_forests_tile = love.graphics.newQuad(142, 0, 69, 80, tile_sheet:getDimensions())
+	plains_grasslands_tile = love.graphics.newQuad(0, 410, 69, 80, tile_sheet:getDimensions())
+    
+    hills_shrub_tile = love.graphics.newQuad(0, 328, 69, 80, tile_sheet:getDimensions())
+	hills_stony_tile = love.graphics.newQuad(0, 246, 69, 80, tile_sheet:getDimensions())
+	hills_woods_tile = love.graphics.newQuad(0, 164, 69, 80, tile_sheet:getDimensions())
+
+	mountains_alpine_tile = love.graphics.newQuad(71, 410, 69, 80, tile_sheet:getDimensions())
+	mountains_rocky_tile = love.graphics.newQuad(71, 328, 69, 80, tile_sheet:getDimensions())
+	mountains_tundra_tile = love.graphics.newQuad(71, 246, 69, 80, tile_sheet:getDimensions())
+
+	peaks_ice_tile = love.graphics.newQuad(71, 164, 69, 80, tile_sheet:getDimensions())
+    
 end
 
 function love.draw(dt)
@@ -50,8 +72,42 @@ function love.draw(dt)
         if - (hex_size * 2) < hexX and hexX < scrWidth + (hex_size * 2)
             and - (hex_size * 2) < hexY and hexY < scrHeight + (hex_size * 2) then        
 
-            love.graphics.setColor(hex.lum, hex.lum, hex.lum)
-            love.graphics.polygon(hex.fillType, hex.vertices)
+            -- love.graphics.setColor(hex.lum, hex.lum, hex.lum)
+            -- love.graphics.polygon(hex.fillType, hex.vertices)
+            
+            local imgX, imgY = hex.center.x - (math.sqrt(3) * hex_size /2) , hex.center.y- hex_size
+            
+            if hex.biome == "lowlands_marsh" then
+                love.graphics.draw(tile_sheet, lowlands_marshy_tile, imgX, imgY)                        
+            elseif hex.biome == "lowlands_rocky" then
+                love.graphics.draw(tile_sheet, lowlands_rocky_tile, imgX, imgY)                        
+            elseif hex.biome == "lowlands_beach" then
+                love.graphics.draw(tile_sheet, lowlands_beach_tile, imgX, imgY)
+                            
+            elseif hex.biome == "plains_arid" then
+                love.graphics.draw(tile_sheet, plains_arid_tile, imgX, imgY)                        
+            elseif hex.biome == "plains_grass" then
+                love.graphics.draw(tile_sheet, plains_grasslands_tile, imgX, imgY)                        
+            elseif hex.biome == "plains_forest" then
+                love.graphics.draw(tile_sheet, plains_forests_tile, imgX, imgY)
+            
+            elseif hex.biome == "hills_stony" then
+                love.graphics.draw(tile_sheet, hills_stony_tile, imgX, imgY)                        
+            elseif hex.biome == "hills_shrubs" then
+                love.graphics.draw(tile_sheet, hills_shrub_tile, imgX, imgY)                        
+            elseif hex.biome == "hills_woods" then
+                love.graphics.draw(tile_sheet, hills_woods_tile, imgX, imgY)
+                
+            elseif hex.biome == "mountains_rocky" then
+                love.graphics.draw(tile_sheet, mountains_rocky_tile, imgX, imgY)            
+            elseif hex.biome == "mountains_tundra" then
+                love.graphics.draw(tile_sheet, mountains_tundra_tile, imgX, imgY)            
+            elseif hex.biome == "mountains_alpine" then
+                love.graphics.draw(tile_sheet, mountains_alpine_tile, imgX, imgY)
+                
+            elseif hex.biome == "peaks" then
+                love.graphics.draw(tile_sheet, peaks_ice_tile, imgX, imgY)
+            end
         
             render_count = render_count + 1
         end
@@ -91,7 +147,7 @@ end
 function love.mousepressed(x, y, button)
     if button == 1 then
     
-        local h_id = get_hex_id_from_point(x, y)
+        local h_id = get_hex_id_from_point(cam:worldCoords(x, y))
         if h_id then
             print("\nMouse click at: " .. x .. ", " .. y)
             print("Hex details are:")
@@ -131,7 +187,7 @@ function generate()
     set_elevation()
     set_moisture()
     normalize_noise()
-    -- set_basic_biomes()
+    set_basic_biomes()
     -- set_coastlines()
     -- set_shallows()
     -- set_rivers()
