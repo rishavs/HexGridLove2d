@@ -4,7 +4,7 @@ love.math.setRandomSeed(os.time())
 inspect = require "inspect"
 Camera = require "camera"
 
-local hex_size = 5
+local hex_size = 50
 local hex_grid_gap = 0
 local lvl_width_hex_count = 92
 local lvl_height_hex_count = 79
@@ -26,10 +26,11 @@ local max_raw_mst = 0
     -- State Declarations ----------------------
 local camX, camY, camZoom, camRot = 100, 100, 1, 0
 local screenEdge = 0.95
-cam = Camera(0, 0)
+cam = Camera(100, 100)
     
 local mousex, mousey 
 local hex_grid_obj = {}
+local render_list = {}
 
 function love.load(arg)
 
@@ -41,13 +42,13 @@ end
 
 function love.draw(dt)
     local render_count = 0
-    -- cam:attach()
+    cam:attach()
     for id, hex in pairs(hex_grid_obj) do
-        -- local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
-        local hexX, hexY = hex.center.x, hex.center.y
+        local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
+        -- local hexX, hexY = hex.center.x, hex.center.y
         -- only render if hexes are within the screen
-        if 0 < hexX and hexX < scrWidth 
-            and 0 < hexY and hexY < scrHeight then        
+        if - (hex_size * 2) < hexX and hexX < scrWidth + (hex_size * 2)
+            and - (hex_size * 2) < hexY and hexY < scrHeight + (hex_size * 2) then        
 
             love.graphics.setColor(hex.lum, hex.lum, hex.lum)
             love.graphics.polygon(hex.fillType, hex.vertices)
@@ -55,7 +56,7 @@ function love.draw(dt)
             render_count = render_count + 1
         end
     end
-    -- cam:detach()
+    cam:detach()
 
     -- love.graphics.print( id, hex.center.x -20, hex.center.y -20)
     
@@ -516,7 +517,7 @@ function normalize_noise()
     for id, hex in pairs(hex_grid_obj) do
     
         local norm_elevation = math.max(round((hex.elevation - min_raw_elv) / ( max_raw_elv - min_raw_elv ), 1), 0)
-        print(hex.elevation, norm_elevation)
+        -- print(hex.elevation, norm_elevation)
         hex.elevation = norm_elevation
 
         local norm_moisture = math.max(round((hex.moisture - min_raw_mst) / ( max_raw_mst - min_raw_mst ), 1), 0 )
@@ -566,7 +567,7 @@ function set_basic_biomes ()
         elseif hex.elevation < 0.8 then
             hex.biome = "hills"
             if hex.moisture < 0.6 then
-                hex.biome = "hills_rocky"
+                hex.biome = "hills_stony"
                 hex.tempColor = {188, 170, 164}
             elseif hex.moisture < 0.8 then
                 hex.biome = "hills_shrubs"

@@ -1,0 +1,15 @@
+<TextureAtlas imagePath="sprites.png">
+	<SubTexture name="hills_shrub.png" x="0" y="328" width="69" height="80"/>
+	<SubTexture name="hills_stony.png" x="0" y="246" width="69" height="80"/>
+	<SubTexture name="hills_woods.png" x="0" y="164" width="69" height="80"/>
+	<SubTexture name="lowlands_beach.png" x="0" y="82" width="69" height="80"/>
+	<SubTexture name="lowlands_marshy.png" x="0" y="0" width="69" height="80"/>
+	<SubTexture name="lowlands_rocky.png" x="71" y="0" width="69" height="80"/>
+	<SubTexture name="mountains_alpine.png" x="71" y="410" width="69" height="80"/>
+	<SubTexture name="mountains_rocky.png" x="71" y="328" width="69" height="80"/>
+	<SubTexture name="mountains_tundra.png" x="71" y="246" width="69" height="80"/>
+	<SubTexture name="peaks_ice.png" x="71" y="164" width="69" height="80"/>
+	<SubTexture name="plains_arid.png" x="71" y="82" width="69" height="80"/>
+	<SubTexture name="plains_forests.png" x="142" y="0" width="69" height="80"/>
+	<SubTexture name="plains_grasslands.png" x="0" y="410" width="69" height="80"/>
+</TextureAtlas>
