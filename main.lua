@@ -13,9 +13,9 @@ local scrWidth = love.graphics.getWidth()
 local scrHeight = love.graphics.getHeight()
 
 local var_a = 0.1
-local var_b = 0.6
-local var_c = 0.7
-local var_d = 0.4
+local var_b = 1
+local var_c = 1
+local var_d = 0.3
 local var_e = 0.4
 
 local min_raw_elv = 1
@@ -30,7 +30,16 @@ cam = Camera(100, 100)
     
 local mousex, mousey 
 local hex_grid_obj = {}
+local hex_grid_ordered_table = {}
 local render_list = {}
+
+local biome_detail_obj = {
+    
+
+
+
+
+}
 
 function love.load(arg)
 
@@ -39,76 +48,28 @@ function love.load(arg)
     
     generate()
 
-    -- Load sprite sheet
-    tile_sheet = love.graphics.newImage("assets/FlatHexes/sprites.png")
-    
-	lowlands_beach_tile = love.graphics.newQuad(0, 82, 69, 80, tile_sheet:getDimensions())
-	lowlands_marshy_tile = love.graphics.newQuad(0, 0, 69, 80, tile_sheet:getDimensions())
-	lowlands_rocky_tile = love.graphics.newQuad(71, 0, 69, 80, tile_sheet:getDimensions())
-
-	plains_arid_tile = love.graphics.newQuad(71, 82, 69, 80, tile_sheet:getDimensions())
-	plains_forests_tile = love.graphics.newQuad(142, 0, 69, 80, tile_sheet:getDimensions())
-	plains_grasslands_tile = love.graphics.newQuad(0, 410, 69, 80, tile_sheet:getDimensions())
-    
-    hills_shrub_tile = love.graphics.newQuad(0, 328, 69, 80, tile_sheet:getDimensions())
-	hills_stony_tile = love.graphics.newQuad(0, 246, 69, 80, tile_sheet:getDimensions())
-	hills_woods_tile = love.graphics.newQuad(0, 164, 69, 80, tile_sheet:getDimensions())
-
-	mountains_alpine_tile = love.graphics.newQuad(71, 410, 69, 80, tile_sheet:getDimensions())
-	mountains_rocky_tile = love.graphics.newQuad(71, 328, 69, 80, tile_sheet:getDimensions())
-	mountains_tundra_tile = love.graphics.newQuad(71, 246, 69, 80, tile_sheet:getDimensions())
-
-	peaks_ice_tile = love.graphics.newQuad(71, 164, 69, 80, tile_sheet:getDimensions())
-    
 end
 
 function love.draw(dt)
     local render_count = 0
     cam:attach()
-    for id, hex in pairs(hex_grid_obj) do
+
+    for _, h_id in ipairs(hex_grid_ordered_table) do
+    
+        local hex = hex_grid_obj[h_id]
+        
         local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
-        -- local hexX, hexY = hex.center.x, hex.center.y
+
         -- only render if hexes are within the screen
         if - (hex_size * 2) < hexX and hexX < scrWidth + (hex_size * 2)
             and - (hex_size * 2) < hexY and hexY < scrHeight + (hex_size * 2) then        
-
-            -- love.graphics.setColor(hex.lum, hex.lum, hex.lum)
-            -- love.graphics.polygon(hex.fillType, hex.vertices)
-            
-            local imgX, imgY = hex.center.x - (math.sqrt(3) * hex_size /2) , hex.center.y- hex_size
-            
-            if hex.biome == "lowlands_marsh" then
-                love.graphics.draw(tile_sheet, lowlands_marshy_tile, imgX, imgY)                        
-            elseif hex.biome == "lowlands_rocky" then
-                love.graphics.draw(tile_sheet, lowlands_rocky_tile, imgX, imgY)                        
-            elseif hex.biome == "lowlands_beach" then
-                love.graphics.draw(tile_sheet, lowlands_beach_tile, imgX, imgY)
-                            
-            elseif hex.biome == "plains_arid" then
-                love.graphics.draw(tile_sheet, plains_arid_tile, imgX, imgY)                        
-            elseif hex.biome == "plains_grass" then
-                love.graphics.draw(tile_sheet, plains_grasslands_tile, imgX, imgY)                        
-            elseif hex.biome == "plains_forest" then
-                love.graphics.draw(tile_sheet, plains_forests_tile, imgX, imgY)
-            
-            elseif hex.biome == "hills_stony" then
-                love.graphics.draw(tile_sheet, hills_stony_tile, imgX, imgY)                        
-            elseif hex.biome == "hills_shrubs" then
-                love.graphics.draw(tile_sheet, hills_shrub_tile, imgX, imgY)                        
-            elseif hex.biome == "hills_woods" then
-                love.graphics.draw(tile_sheet, hills_woods_tile, imgX, imgY)
-                
-            elseif hex.biome == "mountains_rocky" then
-                love.graphics.draw(tile_sheet, mountains_rocky_tile, imgX, imgY)            
-            elseif hex.biome == "mountains_tundra" then
-                love.graphics.draw(tile_sheet, mountains_tundra_tile, imgX, imgY)            
-            elseif hex.biome == "mountains_alpine" then
-                love.graphics.draw(tile_sheet, mountains_alpine_tile, imgX, imgY)
-                
-            elseif hex.biome == "peaks" then
-                love.graphics.draw(tile_sheet, peaks_ice_tile, imgX, imgY)
+            if hex.biome == "ocean" then
+                love.graphics.setColor(50, 50, 50)
+                love.graphics.polygon("line", hex.vertices)
+            else
+                love.graphics.setColor(hex.tempColor)
+                love.graphics.polygon(hex.fillType, hex.vertices)
             end
-        
             render_count = render_count + 1
         end
     end
@@ -191,10 +152,10 @@ function generate()
     -- set_coastlines()
     -- set_shallows()
     -- set_rivers()
+    -- set streams
     -- set_habitability()
     
 
-    -- set_habitability() 
     -- 
 end
 
@@ -263,6 +224,7 @@ function create_hex_grid()
             
             hex_grid_obj[temp_hex_id] = temp_hex
             
+            table.insert(hex_grid_ordered_table, temp_hex_id)
         end
     end
     
@@ -490,10 +452,17 @@ function set_elevation()
                 + 0.01 * love.math.noise (128 * (dx + seed), 128 * (dy + seed))
 
             local elevation = round(((elv_merged_noise + var_a) * (1 - (var_b*d_sqr^var_c))), 2)
-            local water_lvl = round((var_d + var_e * d_sqr ), 2) 
+            local water_lvl = round((var_d + var_e * d_sqr ) , 2) 
             
             if elevation < water_lvl then
-                hex.elevation = 0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
+                hex.elevation = 0.0 -- here we can set elevation as ranom between 0 and water lvl when biomes is done
+                hex.biome = "ocean"
+            elseif elevation < water_lvl * 1.3 then
+                hex.elevation = 0.1            
+                hex.biome = "shallows"
+            elseif elevation < water_lvl * 1.4 then
+                hex.elevation = 0.2
+                hex.biome = "coast"
             else 
                 hex.elevation = elevation
             end
@@ -584,66 +553,67 @@ end
 function set_basic_biomes ()
     for id, hex in pairs(hex_grid_obj) do
         -- 0 to 0.1
-        if hex.elevation < 0.1 then
+        if hex.elevation ==  0 then
             hex.biome = "ocean"
-            hex.tempColor = {20, 120, 200}
+            hex.tempColor = {30, 30, 40}
         -- 0.1 to 0.2
-        elseif hex.elevation < 0.2 then
+        elseif hex.elevation < 0.3 then
             hex.biome = "shallows"
-            hex.tempColor = {0, 150, 250}
+            hex.tempColor = {60, 110, 150}
             
-        elseif hex.elevation < 0.5 then
+        elseif hex.elevation < 0.4 then
             hex.biome = "lowlands"
-            
             if hex.moisture < 0.6 then
                 hex.biome = "lowlands_beach"
-                hex.tempColor = {252, 243, 207}
+                hex.tempColor = {240, 240, 0}
             elseif hex.moisture < 0.8 then
                 hex.biome = "lowlands_rocky"
-                hex.tempColor = {237, 187, 153}
+                hex.tempColor = {100, 50, 0}
             else
                 hex.biome = "lowlands_marsh"
-                hex.tempColor = {162, 217, 206}
+                hex.tempColor = {0, 50, 10}
             end
-
             
         elseif hex.elevation < 0.7 then
             hex.biome = "plains"
-            if hex.moisture < 0.4 then
+            if hex.moisture < 0.3 then
                 hex.biome = "plains_arid"
-                hex.tempColor = {255, 171, 145}
-            elseif hex.moisture < 0.7 then
+                hex.tempColor = {170, 190, 170}
+            elseif hex.moisture < 0.5 then
                 hex.biome = "plains_grass"
-                hex.tempColor = {139, 195, 74}
+                hex.tempColor = {150, 200, 10}
+            elseif hex.moisture < 0.7 then
+                hex.biome = "plains_temperate"
+                hex.tempColor = {10, 90, 10}
             else
-                hex.biome = "plains_forest"
+                hex.biome = "plains_tropical"
                 hex.tempColor = {27, 94, 32}
             end
             
         elseif hex.elevation < 0.8 then
             hex.biome = "hills"
-            if hex.moisture < 0.6 then
+            if hex.moisture < 0.3 then
                 hex.biome = "hills_stony"
-                hex.tempColor = {188, 170, 164}
-            elseif hex.moisture < 0.8 then
+                hex.tempColor = {240, 170, 110}
+            elseif hex.moisture < 0.7 then
                 hex.biome = "hills_shrubs"
-                hex.tempColor = {220, 237, 200}
+                hex.tempColor = {0, 200, 100}
             else
                 hex.biome = "hills_woods"
-                hex.tempColor = {158, 157, 36}
+                hex.tempColor = {100, 100, 50}
             end
             
         elseif hex.elevation < 0.9 then
             hex.biome = "mountains"
-            if hex.moisture < 0.6 then
+            if hex.moisture < 0.3 then
                 hex.biome = "mountains_rocky"
-                hex.tempColor = {109, 76, 65}
-            elseif hex.moisture < 0.8 then
+                hex.tempColor = {250, 230, 215}
+            elseif hex.moisture < 0.7 then
                 hex.biome = "mountains_tundra"
-                hex.tempColor = {230, 238, 156}
+                hex.tempColor = {200, 230, 180}
             else
                 hex.biome = "mountains_alpine"
-                hex.tempColor = {129, 199, 132}
+                hex.tempColor = {200, 255, 255}
             end
         else
             hex.biome = "peaks"
