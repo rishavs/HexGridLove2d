@@ -45,41 +45,24 @@ function love.load(arg)
 
     lvl_pixel_width = round((lvl_width_hex_count + 1) * math.sqrt(3) * hex_size)
     lvl_pixel_height = round(2 * hex_size + (1.5 * hex_size * (lvl_height_hex_count -1)))
+    canvas = love.graphics.newCanvas(lvl_pixel_width, lvl_pixel_height)
     
     generate()
-
+    draw_on_canvas()
 end
 
 function love.draw(dt)
     local render_count = 0
     cam:attach()
+        love.graphics.draw(canvas)
 
-    for _, h_id in ipairs(hex_grid_ordered_table) do
-    
-        local hex = hex_grid_obj[h_id]
-        
-        local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
-
-        -- only render if hexes are within the screen
-        if - (hex_size * 2) < hexX and hexX < scrWidth + (hex_size * 2)
-            and - (hex_size * 2) < hexY and hexY < scrHeight + (hex_size * 2) then        
-            if hex.biome == "ocean" then
-                love.graphics.setColor(50, 50, 50)
-                love.graphics.polygon("line", hex.vertices)
-            else
-                love.graphics.setColor(hex.tempColor)
-                love.graphics.polygon(hex.fillType, hex.vertices)
-            end
-            render_count = render_count + 1
-        end
-    end
     cam:detach()
 
     -- love.graphics.print( id, hex.center.x -20, hex.center.y -20)
     
     love.graphics.setColor(255, 255, 255)
     love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)    
-    love.graphics.print("Hexes: ".. render_count, 10, 30)
+    -- love.graphics.print("Hexes: ".. render_count, 10, 30)
 end
 
 local camAccl = 0
@@ -160,7 +143,22 @@ function generate()
 end
 
 function draw_on_canvas()
+    love.graphics.setCanvas(canvas)
+        for _, h_id in ipairs(hex_grid_ordered_table) do
+        
+            local hex = hex_grid_obj[h_id]
+            
+            local hexX, hexY = cam:cameraCoords(hex.center.x, hex.center.y)
 
+            if hex.biome == "ocean" then
+                love.graphics.setColor(50, 50, 50)
+                love.graphics.polygon("line", hex.vertices)
+            else
+                love.graphics.setColor(hex.tempColor)
+                love.graphics.polygon(hex.fillType, hex.vertices)
+            end
+        end
+    love.graphics.setCanvas()
 end
 
 function set_seed(s)
